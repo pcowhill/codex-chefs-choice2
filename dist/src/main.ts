@@ -1,0 +1,156 @@
+"use strict";
+const app = document.getElementById('app');
+app.innerHTML = `<canvas id=c></canvas><div class=hud><div class=top id=hudTop></div><div class=reticle></div><div class=toast id=toast></div><button class="btn pause" id=pauseBtn>Pause</button><div id=screen></div></div>`;
+const c = document.getElementById('c'), ctx = c.getContext('2d'), hudTop = document.getElementById('hudTop'), toast = document.getElementById('toast'), screen = document.getElementById('screen');
+let W = 0, H = 0;
+function resize() { W = c.width = innerWidth * devicePixelRatio; H = c.height = innerHeight * devicePixelRatio; c.style.width = innerWidth + 'px'; c.style.height = innerHeight + 'px'; }
+addEventListener('resize', resize);
+resize();
+let mode = 'title', objs = [], hook = null, hp = 100, ore = 0, quota = 12, wave = 1, score = 0, time = 0, dash = 0, px = 0, pz = 7, pvx = 0, pvz = 0, mouse = { x: 0, y: 0 }, muted = false, shake = 0, reason = '';
+const keys = new Set();
+let ac = null;
+function beep(f, d = .05) { if (muted)
+    return; ac || (ac = new (AudioContext || window.webkitAudioContext)()); let o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f; g.gain.value = .035; o.connect(g); g.connect(ac.destination); o.start(); g.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + d); o.stop(ac.currentTime + d); }
+function proj(x, y, z) { const camY = 23, camZ = 30, cz = z - camZ, cy = y - camY; const yy = cy * .78 - cz * .62, zz = cy * .62 + cz * .78 + 48; const s = 620 * devicePixelRatio / zz; return { x: W / 2 + x * s, y: H * .54 + yy * s, s }; }
+function add(kind) { const a = Math.random() * 7, r = 6 + Math.random() * 17; objs.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, y: kind === 'ore' ? .5 : .9, vx: 0, vz: 0, r: kind === 'ore' ? .8 : 1, kind, hp: kind === 'enemy' ? 2 + Math.floor(wave / 3) : 1, value: 1 + Math.floor(wave / 4) }); }
+function start() { mode = 'playing'; objs = []; hook = null; hp = 100; ore = 0; quota = 12; wave = 1; score = 0; time = 0; px = 0; pz = 7; pvx = pvz = 0; for (let i = 0; i < 14; i++)
+    add('ore'); for (let i = 0; i < 3; i++)
+    add('enemy'); screen.innerHTML = ''; beep(220, .1); }
+function title() { screen.innerHTML = `<div class=panel><h1>GRAVITY<br>JUNKERS</h1><p>Harpoon green ore, tow it to the golden core, and survive red drones. Your tether pulls both ways: cargo is payday, anchor, and wrecking ball.</p><p class=small>WASD thrust · Mouse aim · Click tether/release · Space dash · Shift brake · P pause · R restart · M mute</p><div class=btns><button class=btn id=play>Launch Run</button><button class=btn id=mute>Audio: On</button></div></div>`; (document.getElementById('play')).onclick = start; (document.getElementById('mute')).onclick = () => { muted = !muted; document.getElementById('mute').textContent = 'Audio: ' + (muted ? 'Off' : 'On'); }; }
+function end(r) { mode = 'ended'; reason = r; screen.innerHTML = `<div class=panel><h2>${r}</h2><p>Score <b>${score}</b> · Wave <b>${wave}</b> · Ore <b>${ore}</b> · Time <b>${time.toFixed(1)}s</b></p><button class=btn id=again>Play Again</button></div>`; (document.getElementById('again')).onclick = start; }
+function pause() { if (mode === 'playing') {
+    mode = 'paused';
+    screen.innerHTML = `<div class=panel><h2>Paused</h2><button class=btn id=res>Resume</button> <button class=btn id=again>Restart</button></div>`;
+    (document.getElementById('res')).onclick = () => { mode = 'playing'; screen.innerHTML = ''; };
+    (document.getElementById('again')).onclick = start;
+}
+else if (mode === 'paused') {
+    mode = 'playing';
+    screen.innerHTML = '';
+} }
+addEventListener('keydown', e => { keys.add(e.key.toLowerCase()); if (e.key.toLowerCase() === 'p')
+    pause(); if (e.key.toLowerCase() === 'r')
+    start(); if (e.key.toLowerCase() === 'm')
+    muted = !muted; });
+addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+addEventListener('mousemove', e => mouse = { x: e.clientX, y: e.clientY });
+addEventListener('mousedown', () => { if (mode !== 'playing')
+    return; if (hook) {
+    hook = null;
+    beep(140);
+}
+else {
+    let b = null, bd = 7;
+    for (const o of objs) {
+        let d = Math.hypot(o.x - px, o.z - pz);
+        if (d < bd) {
+            bd = d;
+            b = o;
+        }
+    }
+    hook = b;
+    if (b)
+        beep(520);
+} });
+(document.getElementById('pauseBtn')).onclick = pause;
+function update(dt) { time += dt; let ix = (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0), iz = (keys.has('s') ? 1 : 0) - (keys.has('w') ? 1 : 0), l = Math.hypot(ix, iz) || 1; pvx += ix / l * 18 * dt; pvz += iz / l * 18 * dt; if (keys.has('shift')) {
+    pvx *= .9;
+    pvz *= .9;
+} dash = Math.max(0, dash - dt); if (keys.has(' ') && dash <= 0) {
+    pvx *= 1.9;
+    pvz *= 1.9;
+    dash = 2.1;
+    shake = .25;
+    beep(90, .1);
+} if (hook) {
+    let dx = hook.x - px, dz = hook.z - pz, d = Math.max(1, Math.hypot(dx, dz));
+    pvx += dx / d * 18 * dt / d;
+    pvz += dz / d * 18 * dt / d;
+    hook.vx -= dx / d * 24 * dt / d;
+    hook.vz -= dz / d * 24 * dt / d;
+} pvx *= .965; pvz *= .965; px += pvx * dt; pz += pvz * dt; let pr = Math.hypot(px, pz); if (pr > 23) {
+    px *= 23 / pr;
+    pz *= 23 / pr;
+    pvx *= -.35;
+    pvz *= -.35;
+    hp -= 10 * dt;
+} for (const o of [...objs]) {
+    if (o.kind === 'enemy') {
+        let dx = px - o.x, dz = pz - o.z, d = Math.hypot(dx, dz) || 1;
+        o.vx += dx / d * (4 + wave * .35) * dt;
+        o.vz += dz / d * (4 + wave * .35) * dt;
+        if (d < 1.4) {
+            hp -= 28 * dt;
+            shake = .15;
+        }
+    }
+    o.vx *= .97;
+    o.vz *= .97;
+    o.x += o.vx * dt;
+    o.z += o.vz * dt;
+    if (o.kind === 'ore' && Math.hypot(o.x, o.z) < 2.8) {
+        ore += o.value;
+        score += 100 * o.value + wave * 5;
+        objs = objs.filter(q => q !== o);
+        if (hook === o)
+            hook = null;
+        beep(760);
+    }
+    if (o.kind === 'enemy')
+        for (const q of objs.filter(q => q.kind === 'ore'))
+            if (Math.hypot(q.x - o.x, q.z - o.z) < 1.25 && Math.hypot(q.vx, q.vz) > 5) {
+                o.hp--;
+                score += 25;
+                q.vx *= -.4;
+                q.vz *= -.4;
+                if (o.hp <= 0) {
+                    objs = objs.filter(x => x !== o);
+                    score += 200;
+                    beep(110, .12);
+                }
+            }
+} if (ore >= quota) {
+    wave++;
+    quota += 8 + wave * 2;
+    hp = Math.min(100, hp + 20);
+    for (let i = 0; i < 8 + wave; i++)
+        add('ore');
+    for (let i = 0; i < 2 + wave; i++)
+        add('enemy');
+    beep(330, .2);
+} if (Math.random() < dt * (.18 + wave * .03))
+    add('enemy'); if (objs.filter(o => o.kind === 'ore').length < 6)
+    add('ore'); if (hp <= 0)
+    end('Hull Breached'); if (wave >= 6 && ore >= quota)
+    end('Core Stabilized'); }
+function draw() { ctx.fillStyle = '#080b0e'; ctx.fillRect(0, 0, W, H); let sh = shake > 0 ? (Math.random() - .5) * 12 * devicePixelRatio : 0; ctx.save(); ctx.translate(sh, 0); const core = proj(0, 1.8, 0); ctx.fillStyle = '#302217'; ctx.beginPath(); ctx.ellipse(W / 2, H * .56, 300 * devicePixelRatio, 155 * devicePixelRatio, 0, 0, 7); ctx.fill(); ctx.strokeStyle = '#8b4d30'; for (let r = 6; r < 24; r += 3) {
+    ctx.beginPath();
+    let p = proj(r, 0, 0);
+    ctx.ellipse(W / 2, H * .56, p.s * r, p.s * r * .52, 0, 0, 7);
+    ctx.stroke();
+} ctx.fillStyle = '#ffcf5b'; ctx.beginPath(); ctx.arc(core.x, core.y, core.s * 2.2, 0, 7); ctx.fill(); const list = [...objs, { x: px, z: pz, y: .9, r: 1, kind: 'ore', vx: 0, vz: 0, hp: 1, value: 1 }].sort((a, b) => a.z - b.z); for (const o of list) {
+    let p = proj(o.x, o.y, o.z);
+    ctx.fillStyle = o.x === px && o.z === pz ? '#7ed7ff' : o.kind === 'ore' ? '#29d39a' : '#d93a26';
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - p.s * o.r);
+    ctx.lineTo(p.x + p.s * o.r, p.y);
+    ctx.lineTo(p.x, p.y + p.s * o.r);
+    ctx.lineTo(p.x - p.s * o.r, p.y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#f4ead2';
+    ctx.stroke();
+} if (hook) {
+    let a = proj(px, .9, pz), b = proj(hook.x, hook.y, hook.z);
+    ctx.strokeStyle = '#ffcf5b';
+    ctx.lineWidth = 3 * devicePixelRatio;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+} ctx.restore(); }
+let last = performance.now();
+function loop(n) { let dt = Math.min(.033, (n - last) / 1000); last = n; if (mode === 'playing')
+    update(dt); draw(); shake = Math.max(0, shake - dt); hudTop.innerHTML = `<div>HULL<div class=meter><div class=fill style="width:${hp}%"></div></div></div><div class=ore>ORE ${ore}/${quota} · WAVE ${wave} · SCORE ${score}</div><div>${hook ? 'TETHER LOCKED' : 'CLICK TO TETHER'} · DASH ${dash > 0 ? dash.toFixed(1) : 'READY'}</div>`; toast.textContent = mode === 'playing' ? 'Tow green crystals to the golden core. Smash drones with fast cargo.' : ''; requestAnimationFrame(loop); }
+title();
+requestAnimationFrame(loop);
