@@ -19,6 +19,11 @@ I chose a salvage-arena game because it gives a clear objective and a surprising
 - `R` — restart
 - `M` — mute/unmute audio
 
+## Play online
+
+A static build is published at **https://pcowhill.github.io/codex-chefs-choice2/**
+(deployed by `.github/workflows/deploy-pages.yml` on every push to `main`).
+
 ## Run locally
 
 ```bash
