@@ -1,1 +1,1 @@
-{"scripts":{"dev":"node scripts/dev.mjs","build":"tsc && node scripts/build.mjs","typecheck":"tsc --noEmit"},"dependencies":{},"devDependencies":{}}
+{"scripts":{"dev":"node scripts/dev.mjs","build":"tsc && node scripts/build.mjs","typecheck":"tsc --noEmit"},"devDependencies":{"typescript":"^5.9.3"}}

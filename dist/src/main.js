@@ -1,4 +1,3 @@
-"use strict";
 const app = document.getElementById('app');
 app.innerHTML = `<canvas id=c></canvas><div class=hud><div class=top id=hudTop></div><div class=reticle></div><div class=toast id=toast></div><button class="btn pause" id=pauseBtn>Pause</button><div id=screen></div></div>`;
 const c = document.getElementById('c'), ctx = c.getContext('2d'), hudTop = document.getElementById('hudTop'), toast = document.getElementById('toast'), screen = document.getElementById('screen');
